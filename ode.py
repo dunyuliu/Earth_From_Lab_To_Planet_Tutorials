@@ -7,7 +7,7 @@
 # x[n]:  starting values of variables
 # fx[n]: functions which take (x, par) as argument
 # n:     dimension of problem
-# hc:    timestep
+# hs:    timestep
 # par:   parameters
 
 #
@@ -21,7 +21,7 @@ def euler(t, x, fx, n, hs, par):
 #
 # midpoint method 
 #
-def midpoint(t,x, fx, n, hs, par):
+def midpoint(t, x, fx, n, hs, par):
     ind = range(n)
     k = [] 
     for i in ind:
@@ -37,7 +37,7 @@ def midpoint(t,x, fx, n, hs, par):
 #
 # 4th order Runge Kutta 
 #
-def runge_kutta(t,x, fx, n, hs,par):
+def runge_kutta(t, x, fx, n, hs, par):
     ind = range(n)
     k1 = []
     k2 = []

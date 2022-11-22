@@ -216,7 +216,7 @@ else
     area_string ='';
 end
 
-system(['triangle ',binary_flag,' ',order_flag,...,
+system(['triangle.exe ',binary_flag,' ',order_flag,...,
     ' ',fb_flag,...
     ' -pQIq',num2str(mesh_par.qangle),...
         'A', area_string,' ',modelname,'.poly']);

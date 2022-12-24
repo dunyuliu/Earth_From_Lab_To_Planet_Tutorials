@@ -7,7 +7,8 @@ The repository contains Jupyter Notebooks, which use python and relevant package
 To use Jupyter Notebooks, there are a few options: 
 1. Generally a Linux system supports python. <br/> 
 2. Anaconda is a platform good for all operating systems including Windows, Linux ( and MacOS?). An installation guide of Anaconda is provided below. <br/>
-3. [Binder](mybinder.org) is a good option to run Jupyter Notebooks on a web browser regardless of operating systems. Binder will create a docker container if we give it the link to our repository. It will take a few minutes to build and launch. <br/>
+3. [Binder](https://mybinder.org/) is a good option to run Jupyter Notebooks on a web browser regardless of operating systems. After you open https://mybinder.org, insert the link to our GitHub repository https://github.com/dunyuliu/UT_Earth_Dynamics_Numerical_Tutorials.git to the block under "GitHub repository name or URL". Then, click "launch". Binder will create a docker container. It will take a few minutes to build and launch. Then, Jupyter Notebooks will be open in a new web browser tab. <br/>
+After you successfully launch your repository on binder, you can copy and share the link in the block under "Copy the URL below and share your Binder with others:" to allow others to use your repository built on binder. <br/> 
 4. Docker (in progress). <br/>
 
 ### 1.1 Installation of Anaconda

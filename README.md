@@ -1,4 +1,4 @@
-# UT_Earth_Dynamics_Numerical_Tutorials
+# UT_Earth_From_Lab_to_Planet_Numerical_Tutorials
 This repository hosts the Jupyter notebooks and MATLAB scripts of numerical toturials for UT GEOL 315L: Earth From Lab to Planet, Spring 2023. <br/>
 
 This README includes the following sections: 1. Installation of computing environments; 2. Resources for Jupyter Notebook beginners.

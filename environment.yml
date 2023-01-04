@@ -1,13 +1,15 @@
-name: geol315
+name: geol
 channels:
- - conda-force
- - anaconda
- - defaults
+  - conda-forge
+  - anaconda
+  - defaults
 dependencies:
- - jupyter
- - pip
- - ipywidgets
- - matplotlib
- - nump
- - scipy
- - pandas
+  - python
+  - jupyter
+  - pip
+  - pip:
+    - ipywidgets
+    - matplotlib
+    - numpy
+    - scipy
+    - pandas

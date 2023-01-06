@@ -15,7 +15,7 @@ Then, click "launch". Binder will create a docker container. <br/>
 It will take a few minutes to build and launch. Then, Jupyter Notebooks will be open in a new web browser tab. <br/>
 After you successfully launch your repository on binder, you can copy and share the link in the block under "Copy the URL below and share your Binder with others:" to allow others to use your repository built on binder. <br/> 
 
-Currently, an already built and working repository could be accessed via this [LINK](https://mybinder.org/v2/gh/dunyuliu/UT_Earth_Dynamics_Numerical_Tutorials.git/cf2519046f888db82737bae9977ceb7fc1b7b066) (will be updated in the future). <br/>
+Currently, an already built and working repository could be accessed via this [LINK](https://mybinder.org/v2/gh/dunyuliu/UT_Earth_Dynamics_Numerical_Tutorials.git/HEAD) (will be updated in the future). <br/>
 (d) Docker (in progress). <br/>
 
 ### 1.1 Installation of Anaconda

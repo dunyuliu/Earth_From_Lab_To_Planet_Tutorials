@@ -6,6 +6,7 @@ channels:
 dependencies:
   - python
   - jupyter
+  - landlab
   - pip
   - pip:
     - ipywidgets

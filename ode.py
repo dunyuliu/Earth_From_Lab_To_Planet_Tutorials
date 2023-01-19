@@ -15,23 +15,22 @@
 #
 def euler(t, x, fx, n, hs, par):
     for i in range(n):
-        x[i] = x[i] + hs * fx[i](t,x,par)
-    return x
+        xout[i] = x[i] + hs * fx[i](t,x,par)
+    return xout
 
 #
 # midpoint method 
 #
 def midpoint(t, x, fx, n, hs, par):
     ind = range(n)
-    k = [] 
+    k1 = [] 
     for i in ind:
-        k.append(x[i]+hs/2*fx[i](t,x,par)) # advance x by half an euler step
-                                           # to get the midpoint
+        k1.append(fx[i](t,x,par)*hs)
         
     for i in ind:               # euler step but df/dt evaluated at the midpoint
-        x[i] = x[i] + hs * fx[i](t+hs/2,k,par)
+        xout[i] = xout[i] + hs * fx[i](t+hs/2,x+k1/2,par)
 
-    return x
+    return xout
 
 
 #
@@ -59,6 +58,6 @@ def runge_kutta(t, x, fx, n, hs, par):
     for i in ind:               # k4 = h * f(t+h,x+k3)
         k4.append(fx[i](t,xk,par)*hs)
     for i in ind:               # dx = k1/6 + k2/3 + k3/3 + k4/6
-        x[i] = x[i] + (k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6
-    return x
+        xout[i] = x[i] + (k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6
+    return xout
 

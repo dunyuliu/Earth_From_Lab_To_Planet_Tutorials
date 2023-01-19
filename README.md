@@ -1,4 +1,4 @@
-# Inatructor version with solutions
+# Instructor version with solutions
 
 
 # UT_Earth_From_Lab_to_Planet_Numerical_Tutorials

@@ -7,57 +7,71 @@
 # x[n]:  starting values of variables
 # fx[n]: functions which take (x, par) as argument
 # n:     dimension of problem
-# hs:    timestep
+# h:    timestep
 # par:   parameters
 
-#
-# Euler method 
-#
-def euler(t, x, fx, n, hs, par):
-    for i in range(n):
-        xout[i] = x[i] + hs * fx[i](t,x,par)
-    return xout
+import numpy as np
+
+
+#  Euler method 
+def euler(t, y, f, neq, h,par):
+    # The function will take in y at the current time and update and return the y one step size h further according to function fx.
+    # neq: number of equations in the reduced order ODE system. In this case, neq == 1.
+    yout=np.zeros(neq)
+    for i in range(neq):            # Loop over all the equations in the system.
+        # NOTE: in python, index starts from 0. Therefore, for neq==1, i will start from 0. 
+        # In this case, there is only i==0 in the loop. 
+        # If you want to check value in i, try print it out and uncomment the following line:
+        # print(i)
+        yout[i] = y[i] + h * f[i](t,y,par) 
+        # Please fill out the above missing parts ?? to make this function work!
+    return yout
+
 
 #
 # midpoint method 
 #
-def midpoint(t, x, fx, n, hs, par):
-    ind = range(n)
-    k1 = [] 
-    for i in ind:
-        k1.append(fx[i](t,x,par)*hs)
-        
-    for i in ind:               # euler step but df/dt evaluated at the midpoint
-        xout[i] = xout[i] + hs * fx[i](t+hs/2,x+k1/2,par)
 
-    return xout
+
+def midpoint(t, y, f, neq, h,par):
+    # The function will take in y at the current time and update and return the y one step size h further according to function fx.
+
+    k1 = np.zeros(neq) 
+    k2 = np.zeros(neq)
+    yout = np.zeros(neq)
+    
+    for i in range(neq):            # Loop over all the equations in the system.
+        k1[i] = f[i](t,y,par)*h     
+    for i in range(neq):   
+        k2[i] = f[i](t+h/2,y+k1/2,par)*h
+    yout=y+k2
+    
+    return yout
+
+
+
 
 
 #
 # 4th order Runge Kutta 
 #
-def runge_kutta(t, x, fx, n, hs, par):
-    ind = range(n)
-    k1 = []
-    k2 = []
-    k3 = []
-    k4 = []
-    xk = []
-    for i in ind:               # k1 = h * f(t,y)
-        k1.append(fx[i](t,x,par)*hs)
-    for i in ind:
-        xk.append(x[i] + k1[i]/2)
-    for i in ind:               # k2 = h * f(t+h/2,x+k1/2)
-        k2.append(fx[i](t+hs/2,xk,par)*hs)
-    for i in ind:
-        xk[i] = x[i] + k2[i]/2
-    for i in ind:               # k3 = h * f(t+h/2,x+k2/2)
-        k3.append(fx[i](t+hs/2,xk,par)*hs)
-    for i in ind:
-        xk[i] = x[i] + k3[i]
-    for i in ind:               # k4 = h * f(t+h,x+k3)
-        k4.append(fx[i](t,xk,par)*hs)
-    for i in ind:               # dx = k1/6 + k2/3 + k3/3 + k4/6
-        xout[i] = x[i] + (k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6
-    return xout
+
+def runge_kutta(t, y, f, neq, h,par):
+    # The function will take in x at the current time and update and return the x one step size h further according to function fx.
+    k1 = np.zeros(neq) 
+    k2 = np.zeros(neq)
+    k3 = np.zeros(neq)
+    k4 = np.zeros(neq)
+    for i in range(neq):   # Loop over all the equations in the system.
+        k1[i]=f[i](t    , y     ,par)*h 
+    for i in range(neq): 
+        k2[i]=f[i](t+h/2, y+k1/2,par)*h
+    for i in range(neq): 
+        k3[i]=f[i](t+h/2, y+k2/2,par)*h
+    for i in range(neq): 
+        k4[i]=f[i](t+h  , y+k3,  par)*h
+   
+    yout = y + (k1 + 2*k2 + 2*k3 + k4)/6
+    return yout
+
 

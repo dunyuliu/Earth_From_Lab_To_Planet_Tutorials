@@ -1,0 +1,19 @@
+# Before creating the anaconda env, you may need to 
+# sudo apt install libgl1-mesa-glx xvfb
+# on Ubuntu.
+
+# Then run the following command to create the conda env for fenicsx
+# conda env create -f fenicsx-env.yml
+name: fenicsx
+channels:
+  - conda-forge
+dependencies:
+  - python>=3
+  - fenics-dolfinx 
+  - mpich 
+  - pyvista
+  - matplotlib
+  - jupyter
+  - pip
+  - pip:
+    - gmsh

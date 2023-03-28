@@ -65,7 +65,7 @@ def gmsh_stokes_tutorial(par):
     #surfs = gmsh.model.occ.getEntities(dim=2)
     #print(surfs)
     lines = gmsh.model.occ.getEntities(dim=1)
-    print(lines)
+    #print(lines)
     left_marker   = 12
     right_marker  = 14
     top_marker    = 15
@@ -78,8 +78,8 @@ def gmsh_stokes_tutorial(par):
 
     for surf in gmsh.model.getEntities(dim=2):
         com = gmsh.model.occ.getCenterOfMass(surf[0], surf[1])
-        print('surf', surf)
-        print('com ', com)
+        #print('surf', surf)
+        #print('com ', com)
         # the structure of surf is [(2,1),(2,2)] in this case.
         # the first column 2 indicates the dimension of the entities. So, 2 means surfaces.
         # the second column is the index.
@@ -146,7 +146,7 @@ def fem_main(crust_marker, mantle_marker, inc_marker,
     dgx   = Function(Const)
     dgy   = Function(Const)
 
-    print(dgx, dgy)
+    #print(dgx, dgy)
 
     # locate the cells for different domains (up, down, anomaly)
     crust_cells     = ct.find(crust_marker)
@@ -173,10 +173,10 @@ def fem_main(crust_marker, mantle_marker, inc_marker,
     right_facets = ft.find(right_marker)
     top_facets   = ft.find(top_marker)
     bottom_facets= ft.find(bottom_marker)
-    print('left_facets = ', left_facets)
-    print('right_facets= ', right_facets)
-    print('top_facets  = ', top_facets)
-    print('bottom_facets = ', bottom_facets)
+    #print('left_facets = ', left_facets)
+    #print('right_facets= ', right_facets)
+    #print('top_facets  = ', top_facets)
+    #print('bottom_facets = ', bottom_facets)
 
     # create mesh domain with dolfinx's meshing capability, which is quite limitied.
     #domain = mesh.create_rectangle(MPI.COMM_WORLD, [np.array([0, -R]), np.array([length, R])], 

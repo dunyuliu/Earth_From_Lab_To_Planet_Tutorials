@@ -13,6 +13,7 @@ from dolfinx.io import gmshio
 from math import *
 import sys 
 import gmsh
+from dolfinx.fem.petsc import assemble_matrix_block, assemble_vector_block
 
 def gmsh_stokes_tutorial(par):
     # par is the data class containing model parameters.
@@ -356,11 +357,11 @@ def block_operators(a, a_p, L, bcs, V, Q):
 
     # Assembler matrix operator, preconditioner and RHS vector into
     # single objects but preserving block structure
-    A = fem.petsc.assemble_matrix_block(a, bcs=bcs)
+    A = assemble_matrix_block(a, bcs=bcs)
     A.assemble()
-    P = fem.petsc.assemble_matrix_block(a_p, bcs=bcs)
+    P = assemble_matrix_block(a_p, bcs=bcs)
     P.assemble()
-    b = fem.petsc.assemble_vector_block(L, a, bcs=bcs)
+    b = assemble_vector_block(L, a, bcs=bcs)
 
     # Set the nullspace for pressure (since pressure is determined only
     # up to a constant)
@@ -429,19 +430,19 @@ def block_iterative_solver(a, a_p, L, bcs, V, Q, msh):
     u.x.array[:offset] = x.array_r[:offset]
     p.x.array[:(len(x.array_r) - offset)] = x.array_r[offset:]
 
-    # Save solution to file in XDMF format for visualization, e.g. with
-    # ParaView. Before writing to file, ghost values are updated using
-    # `scatter_forward`.
-    with XDMFFile(MPI.COMM_WORLD, "velocity.xdmf", "w") as ufile_xdmf:
-        #ufile_xdmf.parameters["flush_output"] = True
-        u.x.scatter_forward()
-        ufile_xdmf.write_mesh(msh)     
-        ufile_xdmf.write_function(u)
-        
-    with XDMFFile(MPI.COMM_WORLD, "pressure.xdmf", "w") as pfile_xdmf:
-        p.x.scatter_forward()
-        pfile_xdmf.write_mesh(msh)
-        pfile_xdmf.write_function(p)
+    ## Save solution to file in XDMF format for visualization, e.g. with
+    ## ParaView. Before writing to file, ghost values are updated using
+    ## `scatter_forward`.
+    #with XDMFFile(MPI.COMM_WORLD, "velocity.xdmf", "w") as ufile_xdmf:
+    #    #ufile_xdmf.parameters["flush_output"] = True
+    #    u.x.scatter_forward()
+    #    ufile_xdmf.write_mesh(msh)     
+    #    ufile_xdmf.write_function(u)
+    #    
+    #with XDMFFile(MPI.COMM_WORLD, "pressure.xdmf", "w") as pfile_xdmf:
+    #    p.x.scatter_forward()
+    #    pfile_xdmf.write_mesh(msh)
+    #    pfile_xdmf.write_function(p)
         
     # Compute the $L^2$ norms of the solution vectors
     norm_u, norm_p = u.x.norm(), p.x.norm()

@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+
 import ufl
 from dolfinx.fem import (Constant, Function, FunctionSpace, dirichletbc,
                          extract_function_spaces, form,
@@ -14,19 +17,24 @@ from math import *
 import sys 
 import gmsh
 from dolfinx.fem.petsc import assemble_matrix_block, assemble_vector_block
+import pyvista
+from dolfinx import plot
+
+import warnings
+warnings.filterwarnings("ignore")
 
 def gmsh_stokes_tutorial(par):
     # par is the data class containing model parameters.
     w  = par.w
-    h1 = par.h1
-    h2 = par.h2
+    h1 = par.h_mantle
+    h2 = par.h_crust
     dxx= par.dxx
     ra = par.ra
     rb = par.rb
     rot= par.rot
     xe = par.xe
     ye = par.ye
-    dxx_curv = par.dxx_curv
+
     # the function uses Gmsh Python API to create mesh. 
     gmsh.initialize()
     gmsh.model.add("stokes")
@@ -38,6 +46,10 @@ def gmsh_stokes_tutorial(par):
     gmsh.model.occ.addPoint(0., h1+h2,  0., dxx, 5)
     gmsh.model.occ.addPoint(w,  h1+h2,  0., dxx, 6)
 
+    #ep1 = gmsh.model.occ.addPoint(xe, ye, 0, dxx)
+    #ep2 = gmsh.model.occ.addPoint(xe+ra, ye, 0, dxx)
+    #ep3 = gmsh.model.occ.addPoint(xe, ye+rb, 0, dxx)
+    
     gmsh.model.occ.addLine(1,2,1) # bottom
     gmsh.model.occ.addLine(2,3,2) # right down
     gmsh.model.occ.addLine(3,4,3) # top middle
@@ -48,15 +60,16 @@ def gmsh_stokes_tutorial(par):
 
     #gmsh.model.occ.addCircle(h/2,l/2,0,r, 5, angle1=0., angle2=2*pi)
     # create the elliptical inclusion
-    gmsh.model.occ.addEllipse(xe, ye, 0., ra, rb, 8, angle1=0., angle2=2.*pi) 
-    gmsh.model.occ.rotate([(1,8)], xe, ye, 0., 0, 0, 1, rot) 
+    gmsh.model.occ.addEllipse(xe, ye, 0., ra, rb, 8, angle1=0., angle2=2.*pi)
+    gmsh.model.occ.rotate([(1,8)], xe, ye, 0., 0, 0, 1, rot)  
+    
     # [(1,8)] stands for 1 - dimension of the entitiy, here it is an ellipse loop. 
     # 8 stands for the tag of that entity.
 
     gmsh.model.occ.addCurveLoop([3,7,6,5],1) # create the loop for the top rectangle
     gmsh.model.occ.addCurveLoop([1,2,3,4],2) # create the loop for the bottom rectangle 
     gmsh.model.occ.addCurveLoop([8],3)       # create the loop for the inclusion
-
+  
     gmsh.model.occ.addPlaneSurface([1],1)    # create the plane for the top rectangle
     gmsh.model.occ.addPlaneSurface([2,3],2)  # create the plane for the (bottom rectangle - inclusion)
     gmsh.model.occ.addPlaneSurface([3],3)    # create the plane for the inclusion        
@@ -116,7 +129,8 @@ def gmsh_stokes_tutorial(par):
     gmsh.model.addPhysicalGroup(1, top, top_marker, "top")
     gmsh.model.addPhysicalGroup(1, left, left_marker, "left")
 
-    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", dxx_curv)
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 1./dxx)
+    gmsh.option.setNumber("General.Terminal", 0)
     gmsh.model.mesh.generate(2)
 
     gmsh.write('stokes.msh')
@@ -196,11 +210,16 @@ def fem_main(crust_marker, mantle_marker, inc_marker,
 
     bottom_dofs   = locate_dofs_topological(V, msh.topology.dim-1, bottom_facets)
     bottom_y_dofs = locate_dofs_topological(V.sub(1), msh.topology.dim-1, bottom_facets)
+    top_dofs = locate_dofs_topological(V, msh.topology.dim-1, top_facets)
     top_x_dofs    = locate_dofs_topological(V.sub(0), msh.topology.dim-1, top_facets)
     top_y_dofs    = locate_dofs_topological(V.sub(1), msh.topology.dim-1, top_facets)
+    
+    left_dofs = locate_dofs_topological(V, msh.topology.dim-1, left_facets)
     left_x_dofs   = locate_dofs_topological(V.sub(0), msh.topology.dim-1, left_facets)
-    right_x_dofs  = locate_dofs_topological(V.sub(0), msh.topology.dim-1, right_facets)
     left_y_dofs   = locate_dofs_topological(V.sub(1), msh.topology.dim-1, left_facets)
+    
+    right_dofs = locate_dofs_topological(V, msh.topology.dim-1, right_facets)
+    right_x_dofs  = locate_dofs_topological(V.sub(0), msh.topology.dim-1, right_facets)
     right_y_dofs  = locate_dofs_topological(V.sub(1), msh.topology.dim-1, right_facets)
 
     # Lid velocity
@@ -222,6 +241,11 @@ def fem_main(crust_marker, mantle_marker, inc_marker,
         bcs = [dirichletbc(PETSc.ScalarType(0), bottom_y_dofs, V.sub(1)),
                dirichletbc(PETSc.ScalarType(0), left_x_dofs,   V.sub(0)),
                dirichletbc(PETSc.ScalarType(0), right_x_dofs,  V.sub(0))]
+    elif bcs_type == 3:
+        bcs = [dirichletbc(noslip, top_dofs, V),
+                dirichletbc(noslip, bottom_dofs, V),
+                dirichletbc(noslip, left_dofs, V),
+                dirichletbc(noslip, right_dofs, V),]
     elif bcs_type == 3:
         bcs = [dirichletbc(noslip, bottom_dofs, V),
                dirichletbc(PETSc.ScalarType(1), top_x_dofs,    V.sub(0)),
@@ -451,3 +475,158 @@ def block_iterative_solver(a, a_p, L, bcs, V, Q, msh):
         print(f"(B) Norm of pressure coefficient vector (blocked, iterative): {norm_p}")
 
     return norm_u, norm_p, u, p
+
+def modelGeometryCheck(par):
+    if (par.h_crust < 2*par.dxx) or (par.h_mantle < 2*par.dxx) or (par.w < 2*par.dxx):
+        sys.exit('ERROR: one of [w, h_crust, h_mantle] is less than 2 grid sizes.')
+    if par.xe+par.ra>par.w or par.xe-par.ra<0 or par.xe+par.rb>par.w or par.xe-par.rb<0:
+        sys.exit('ERROR: the ellipse anomaly is out of lateral boundaries of the model domain. Please redesign.')
+    if par.ye+par.ra>par.h_mantle or par.ye-par.ra<0 or par.ye+par.rb>par.h_mantle or par.ye-par.rb<0:
+        sys.exit('ERROR: the ellipse anomaly is out of vertical bounds of the mantle layer. Please redesign.')
+        
+def describeModel(par):
+    print('Model description.')
+    print('A 2-D block that has two horizontal layers.')
+    print('The thicknesses of the crust and mantle are ',par.h_crust, par.h_mantle, ' in height, respectively.')
+    print('An ellipitical shaped anomaly that has half major and minor axis lengths of', par.ra, par.rb,' is inserted and its center is located at', par.xe, par.ye)
+    print('The ellipse can be rotated counterclockwise with par.rot in radians. The default value is ', par.rot/pi, ' pi.')
+    print('The viscosities of the top, bottom, and elliptical anomaly are ', par.eta_crust, par.eta_mantle, par.eta_inc, ' respectively.')
+    print('The gravity anomaly for the ellipse is ', par.dgrav)
+    if par.bcs_type==1:
+        bcsDescription = 'free slip for all surfaces.'
+    elif par.bcs_type==2:
+        bcsDescription = 'free slip for lateral sides and bottom, but the top is free.'
+    elif par.bcs_type==3:
+        bcsDescription = 'no slip at bottom, fixed velocity for top, and only horizontal motion and no shear traction for lateral sides.'
+    print('Boundary conditions are ', bcsDescription)
+    modelGeometryCheck(par)
+    print(' ')
+
+def customizedCmap_old():
+    # Define the transition points for the colors
+    transition_points = np.linspace(0, 1, 22)  # 21 intervals
+
+    # Define your colors
+    colors = [
+        (transition_points[i], (1-i/21, 0, i/21)) for i in range(11)  # Blueish to white
+    ] + [
+        (transition_points[i+11], (i/21, 0, 1-i/21)) for i in range(11)  # White to redish
+    ]
+
+    # Create the colormap
+    cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', colors)
+    return cmap
+
+def customizedCmap(values):
+    masked_values = np.ma.masked_where(values == 0, values)
+    cmap = plt.cm.get_cmap('RdBu_r', 11)  # Get the RdBu_r colormap with X colors
+    cmap.set_bad(color='white')  # Set masked values to white
+    return cmap
+
+def getScalarContour(grid, dataArr, varName):
+    
+    grid.point_data[varName] = dataArr
+    grid.set_active_scalars(varName)
+    warped = grid.warp_by_scalar()
+    polyData = warped.extract_geometry()
+    
+    numOfContourLevels = 11
+    contour_levels = np.linspace(polyData.get_data_range()[0], polyData.get_data_range()[1], numOfContourLevels)
+    #contours = polyData.contour(isosurfaces=contour_levels)
+    # https://github.com/pyvista/pyvista/discussions/4754#:~:text=The%20contour%20filter%20only%20works%20on%20point%20data,use%20cell_data_to_point_data%20to%20get%20point%20data%20for%20contouring.
+    # for bookkeeping: the above line to create contours from polyData only plots part of the dataset. It could be related to the unstructuredGrid used. The link provides the following solution. 
+    grid_point_data = grid.cell_data_to_point_data()
+    contours = grid_point_data.contour()
+
+    return contours
+        
+def runScenarioPlot(par, plotStyle='vector'):
+    # sovle the system
+    crust_marker, mantle_marker, inc_marker, \
+    left_marker, right_marker, top_marker, bottom_marker = gmsh_stokes_tutorial(par)
+    a, a_p, L, bcs, V, Q, msh = fem_main(crust_marker, mantle_marker, inc_marker, 
+                                         left_marker, right_marker, top_marker, bottom_marker,
+                                         par)
+    norm_u_1, norm_p_1, u_, p_ = block_iterative_solver(a, a_p, L, bcs, V, Q, msh)
+
+    # Shared setups for plots
+    colorbarPosition = dict(height=0.1, width=0.7, vertical=False, position_x=0.15, position_y=0.05)
+    vectorColorbarArgs = dict(height=0.1, width=0.7, vertical=False, position_x=0.15, position_y=0.05, title="V")
+    contourLinewidth = 2
+    numOfColors = 11
+    
+    # pyvista.start_xvfb()
+    # create a VTK compatible mesh with function space V for velocity.
+    topology, cell_types, geometry = plot.vtk_mesh(V) 
+    # Note that, as of 20231025, the previous plot.create_vtk_mesh is not working anymore. Now change to plot.vtk_mesh(V)
+    values = np.zeros((geometry.shape[0], 3), dtype=np.float64)
+    values[:, :len(u_)] = u_.x.array.real.reshape((geometry.shape[0], len(u_)))
+
+    # Create a point cloud of glyphs
+    grid1 = pyvista.UnstructuredGrid(topology, cell_types, geometry)
+    grid1["V"] = values
+    if norm_u_1 == 0.:
+        glyphs = grid1.glyph(orient="V", factor=1)
+    else:
+        glyphs = grid1.glyph(orient="V", factor=1./norm_u_1)
+       
+    grid_ux = pyvista.UnstructuredGrid(topology, cell_types, geometry)
+    ux_contours = getScalarContour(grid_ux, values[:,0], "Vx")
+    
+    grid_uy = pyvista.UnstructuredGrid(topology, cell_types, geometry)
+    uy_contours = getScalarContour(grid_uy, values[:,1], "Vy")
+    
+    # to visualize the function p_, we create a VTK-compatible grid.
+    # https://docs.fenicsproject.org/dolfinx/main/python/demos/demo_pyvista.html
+    topology_p, cell_types_p, geometry_p = plot.vtk_mesh(Q)
+    grid_p = pyvista.UnstructuredGrid(topology_p, cell_types_p, geometry_p)
+    p_contours = getScalarContour(grid_p, p_.x.array, "P")
+    
+    if plotStyle == 'vector':
+        FigWindowSize = [600, 1400]
+        FontSize = 8
+        subplotter = pyvista.Plotter(shape=(2,1))
+
+        subplotter.subplot(0, 0)
+        subplotter.add_text("Velocity", font_size=FontSize, color="black", position="upper_edge")
+        subplotter.add_mesh(grid1, style="wireframe", color="k")
+        subplotter.add_mesh(glyphs, cmap=plt.cm.get_cmap('RdBu_r', 11), show_edges=False, scalar_bar_args=vectorColorbarArgs)
+        subplotter.view_xy()
+
+        subplotter.subplot(1, 0)
+        subplotter.add_text("Pressure", font_size=FontSize, color="black", position="upper_edge")
+        #cmap = customizedCmap(grid_p)
+        subplotter.add_mesh(grid_p, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        subplotter.add_mesh(p_contours, color="black", line_width=contourLinewidth)
+        subplotter.view_xy()
+
+        subplotter.show(window_size=FigWindowSize)
+    elif plotStyle == 'scalar':
+        FigWindowSize = [600, 2000]
+        FontSize = 8
+        subplotter = pyvista.Plotter(shape=(3,1))
+        
+        subplotter.subplot(0, 0)
+        subplotter.add_text("Velocity_Vx", font_size=FontSize, color="black", position="upper_edge")
+        #cmap = customizedCmap(grid_ux)
+        subplotter.add_mesh(grid_ux, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        subplotter.add_mesh(ux_contours, color="black", line_width=contourLinewidth)
+        subplotter.view_xy()
+
+        subplotter.subplot(1, 0)
+        subplotter.add_text("Velocity_Vy", font_size=FontSize, color="black", position="upper_edge")
+        #cmap = customizedCmap(grid_uy)
+        subplotter.add_mesh(grid_uy, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        subplotter.add_mesh(uy_contours, color="black", line_width=contourLinewidth)
+        subplotter.view_xy()
+        
+        subplotter.subplot(2, 0)
+        subplotter.add_text("Pressure", font_size=FontSize, color="black", position="upper_edge")
+        #cmap = customizedCmap(grid_p)
+        subplotter.add_mesh(grid_p, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        subplotter.add_mesh(p_contours, color="black", line_width=contourLinewidth)
+        subplotter.view_xy()
+        subplotter.show(window_size=FigWindowSize)
+    else:
+        sys.exit('Wrong plotStyle; please choose vector or scalalr')
+    

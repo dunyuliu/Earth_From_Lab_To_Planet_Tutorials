@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 import ufl
 from dolfinx.fem import (Constant, Function, FunctionSpace, dirichletbc,
@@ -246,7 +247,7 @@ def fem_main(crust_marker, mantle_marker, inc_marker,
                 dirichletbc(noslip, bottom_dofs, V),
                 dirichletbc(noslip, left_dofs, V),
                 dirichletbc(noslip, right_dofs, V),]
-    elif bcs_type == 3:
+    elif bcs_type == 4:
         bcs = [dirichletbc(noslip, bottom_dofs, V),
                dirichletbc(PETSc.ScalarType(1), top_x_dofs,    V.sub(0)),
                dirichletbc(PETSc.ScalarType(0), top_y_dofs,    V.sub(1)),
@@ -470,9 +471,9 @@ def block_iterative_solver(a, a_p, L, bcs, V, Q, msh):
         
     # Compute the $L^2$ norms of the solution vectors
     norm_u, norm_p = u.x.norm(), p.x.norm()
-    if MPI.COMM_WORLD.rank == 0:
-        print(f"(B) Norm of velocity coefficient vector (blocked, iterative): {norm_u}")
-        print(f"(B) Norm of pressure coefficient vector (blocked, iterative): {norm_p}")
+    #if MPI.COMM_WORLD.rank == 0:
+    #    print(f"(B) Norm of velocity coefficient vector (blocked, iterative): {norm_u}")
+    #    print(f"(B) Norm of pressure coefficient vector (blocked, iterative): {norm_p}")
 
     return norm_u, norm_p, u, p
 
@@ -497,49 +498,75 @@ def describeModel(par):
     elif par.bcs_type==2:
         bcsDescription = 'free slip for lateral sides and bottom, but the top is free.'
     elif par.bcs_type==3:
+        bcsDescription = 'no slip for all surfaces.'
+    elif par.bcs_type==4:
         bcsDescription = 'no slip at bottom, fixed velocity for top, and only horizontal motion and no shear traction for lateral sides.'
     print('Boundary conditions are ', bcsDescription)
     modelGeometryCheck(par)
     print(' ')
 
-def customizedCmap_old():
-    # Define the transition points for the colors
-    transition_points = np.linspace(0, 1, 22)  # 21 intervals
-
-    # Define your colors
-    colors = [
-        (transition_points[i], (1-i/21, 0, i/21)) for i in range(11)  # Blueish to white
-    ] + [
-        (transition_points[i+11], (i/21, 0, 1-i/21)) for i in range(11)  # White to redish
-    ]
-
-    # Create the colormap
-    cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', colors)
-    return cmap
-
-def customizedCmap(values):
-    masked_values = np.ma.masked_where(values == 0, values)
-    cmap = plt.cm.get_cmap('RdBu_r', 11)  # Get the RdBu_r colormap with X colors
-    cmap.set_bad(color='white')  # Set masked values to white
-    return cmap
-
-def getScalarContour(grid, dataArr, varName):
+def setAndNormalizeScalar(grid, dataArr, varName, normalize):
     
     grid.point_data[varName] = dataArr
     grid.set_active_scalars(varName)
     warped = grid.warp_by_scalar()
     polyData = warped.extract_geometry()
+    dataMin = polyData.get_data_range()[0]
+    dataMax = polyData.get_data_range()[1]
+    normFactor = max(abs(dataMin),abs(dataMax))
+    if normalize==True:
+        print(' ')
+        print('The normalization factor for ', varName, ' is ', normFactor)
+        grid.point_data[varName] = dataArr/normFactor
+    else:
+        print('No normalization is needed.')
+        
+    return grid
+    
+def getScalarContourColorbar(grid, varName):
+    
+    #grid.point_data[varName] = dataArr
+    grid.set_active_scalars(varName)
+    warped = grid.warp_by_scalar()
+    polyData = warped.extract_geometry()
     
     numOfContourLevels = 11
-    contour_levels = np.linspace(polyData.get_data_range()[0], polyData.get_data_range()[1], numOfContourLevels)
+    dataMin = polyData.get_data_range()[0]
+    dataMax = polyData.get_data_range()[1]
+    contour_levels = np.linspace(dataMin, dataMax, numOfContourLevels)
+    dataRange = dataMax - dataMin
+    if abs(dataMax) >= abs(dataMin):
+        indexRange = dataRange/2/abs(dataMax)*numOfContourLevels
+        index0 = int(numOfContourLevels - indexRange)
+        index1 = numOfContourLevels-1
+    else:
+        indexRange = dataRange/2/abs(dataMin)*numOfContourLevels
+        index0 = 0
+        index1 = int(indexRange)
+
+    cmap = mpl.colormaps['RdBu_r']
+    colors = cmap(np.linspace(0, 1, numOfContourLevels))
+    colors[numOfContourLevels//2] = [1,1,1,1] #enforce white
+    new_colors = colors[index0:index1]
+    numOfColors = index1-index0+1
+    new_colormap = mcolors.LinearSegmentedColormap.from_list('new', new_colors, N=numOfColors-1)
+    #print(index0, index1, dataMin, dataMax)
+    #print(colors)
+    #print(numOfColors)
+    #print(new_colors)
+    
     #contours = polyData.contour(isosurfaces=contour_levels)
     # https://github.com/pyvista/pyvista/discussions/4754#:~:text=The%20contour%20filter%20only%20works%20on%20point%20data,use%20cell_data_to_point_data%20to%20get%20point%20data%20for%20contouring.
     # for bookkeeping: the above line to create contours from polyData only plots part of the dataset. It could be related to the unstructuredGrid used. The link provides the following solution. 
     grid_point_data = grid.cell_data_to_point_data()
     contours = grid_point_data.contour()
 
-    return contours
-        
+    return contours, new_colormap, numOfColors
+
+def setColorbarArgs(height=0.1, width=0.85, vertical=False, position_x=0.1, position_y=0.05, fmt="%.1e", label_font_size=11, n_labels=5):
+    colorbarArgs = dict(height=height, width=width, vertical=vertical, position_x=position_x, position_y=position_y, fmt=fmt, label_font_size=label_font_size, n_labels=n_labels)
+    return colorbarArgs
+
 def runScenarioPlot(par, plotStyle='vector'):
     # sovle the system
     crust_marker, mantle_marker, inc_marker, \
@@ -548,16 +575,22 @@ def runScenarioPlot(par, plotStyle='vector'):
                                          left_marker, right_marker, top_marker, bottom_marker,
                                          par)
     norm_u_1, norm_p_1, u_, p_ = block_iterative_solver(a, a_p, L, bcs, V, Q, msh)
-
     # Shared setups for plots
-    colorbarPosition = dict(height=0.1, width=0.7, vertical=False, position_x=0.15, position_y=0.05)
-    vectorColorbarArgs = dict(height=0.1, width=0.7, vertical=False, position_x=0.15, position_y=0.05, title="V")
+
     contourLinewidth = 2
     numOfColors = 11
+    cbHeight = 0.1
+    cbWidth = 0.9
+    cbVertical = False
+    cbPosX = 0.05
+    cbPosY = 0.05
+    cbTextFmt = '%.1f'
+    cbTextFontSize = 12
     
     # pyvista.start_xvfb()
     # create a VTK compatible mesh with function space V for velocity.
     topology, cell_types, geometry = plot.vtk_mesh(V) 
+    topology_p, cell_types_p, geometry_p = plot.vtk_mesh(Q)
     # Note that, as of 20231025, the previous plot.create_vtk_mesh is not working anymore. Now change to plot.vtk_mesh(V)
     values = np.zeros((geometry.shape[0], 3), dtype=np.float64)
     values[:, :len(u_)] = u_.x.array.real.reshape((geometry.shape[0], len(u_)))
@@ -569,19 +602,20 @@ def runScenarioPlot(par, plotStyle='vector'):
         glyphs = grid1.glyph(orient="V", factor=1)
     else:
         glyphs = grid1.glyph(orient="V", factor=1./norm_u_1)
-       
+    
     grid_ux = pyvista.UnstructuredGrid(topology, cell_types, geometry)
-    ux_contours = getScalarContour(grid_ux, values[:,0], "Vx")
-    
     grid_uy = pyvista.UnstructuredGrid(topology, cell_types, geometry)
-    uy_contours = getScalarContour(grid_uy, values[:,1], "Vy")
-    
-    # to visualize the function p_, we create a VTK-compatible grid.
-    # https://docs.fenicsproject.org/dolfinx/main/python/demos/demo_pyvista.html
-    topology_p, cell_types_p, geometry_p = plot.vtk_mesh(Q)
     grid_p = pyvista.UnstructuredGrid(topology_p, cell_types_p, geometry_p)
-    p_contours = getScalarContour(grid_p, p_.x.array, "P")
     
+    # no normalization for now
+    norm_grid_ux = setAndNormalizeScalar(grid_ux, values[:,0], "Vx", normalize=False)
+    norm_grid_uy = setAndNormalizeScalar(grid_uy, values[:,1], "Vy", normalize=False)
+    norm_grid_p = setAndNormalizeScalar(grid_p, -p_.x.array, "P", normalize=False) #flip the sign of p back to tranditional defination.
+    
+    ux_contours, ux_cmap, ux_NumOfColors = getScalarContourColorbar(norm_grid_ux, "Vx")
+    uy_contours, uy_cmap, uy_NumOfColors = getScalarContourColorbar(norm_grid_uy, "Vy")
+    p_contours, p_cmap, p_NumOfColors = getScalarContourColorbar(norm_grid_p, "P")
+
     if plotStyle == 'vector':
         FigWindowSize = [600, 1400]
         FontSize = 8
@@ -590,13 +624,14 @@ def runScenarioPlot(par, plotStyle='vector'):
         subplotter.subplot(0, 0)
         subplotter.add_text("Velocity", font_size=FontSize, color="black", position="upper_edge")
         subplotter.add_mesh(grid1, style="wireframe", color="k")
-        subplotter.add_mesh(glyphs, cmap=plt.cm.get_cmap('RdBu_r', 11), show_edges=False, scalar_bar_args=vectorColorbarArgs)
+        cbArgs = setColorbarArgs(cbHeight, cbWidth, cbVertical, cbPosX, cbPosY, '%.1f', cbTextFontSize, 11)
+        subplotter.add_mesh(glyphs, cmap=plt.cm.get_cmap('RdBu_r', 11), show_edges=False, scalar_bar_args=cbArgs)
         subplotter.view_xy()
 
         subplotter.subplot(1, 0)
         subplotter.add_text("Pressure", font_size=FontSize, color="black", position="upper_edge")
-        #cmap = customizedCmap(grid_p)
-        subplotter.add_mesh(grid_p, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        cbArgs = setColorbarArgs(cbHeight, cbWidth, cbVertical, cbPosX, cbPosY, cbTextFmt, cbTextFontSize, p_NumOfColors)
+        subplotter.add_mesh(grid_p, cmap=p_cmap, show_edges=False, scalar_bar_args=cbArgs)
         subplotter.add_mesh(p_contours, color="black", line_width=contourLinewidth)
         subplotter.view_xy()
 
@@ -608,22 +643,22 @@ def runScenarioPlot(par, plotStyle='vector'):
         
         subplotter.subplot(0, 0)
         subplotter.add_text("Velocity_Vx", font_size=FontSize, color="black", position="upper_edge")
-        #cmap = customizedCmap(grid_ux)
-        subplotter.add_mesh(grid_ux, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        cbArgs = setColorbarArgs(cbHeight, cbWidth, cbVertical, cbPosX, cbPosY, cbTextFmt, cbTextFontSize, ux_NumOfColors)
+        subplotter.add_mesh(grid_ux, cmap=ux_cmap, show_edges=False, scalar_bar_args=cbArgs)
         subplotter.add_mesh(ux_contours, color="black", line_width=contourLinewidth)
         subplotter.view_xy()
 
         subplotter.subplot(1, 0)
         subplotter.add_text("Velocity_Vy", font_size=FontSize, color="black", position="upper_edge")
-        #cmap = customizedCmap(grid_uy)
-        subplotter.add_mesh(grid_uy, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        cbArgs = setColorbarArgs(cbHeight, cbWidth, cbVertical, cbPosX, cbPosY, cbTextFmt, cbTextFontSize, uy_NumOfColors)
+        subplotter.add_mesh(grid_uy, cmap=uy_cmap, show_edges=False, scalar_bar_args=cbArgs)
         subplotter.add_mesh(uy_contours, color="black", line_width=contourLinewidth)
         subplotter.view_xy()
         
         subplotter.subplot(2, 0)
         subplotter.add_text("Pressure", font_size=FontSize, color="black", position="upper_edge")
-        #cmap = customizedCmap(grid_p)
-        subplotter.add_mesh(grid_p, cmap=plt.cm.get_cmap('RdBu_r', numOfColors), show_edges=False, scalar_bar_args=colorbarPosition)
+        cbArgs = setColorbarArgs(cbHeight, cbWidth, cbVertical, cbPosX, cbPosY, cbTextFmt, cbTextFontSize, p_NumOfColors)
+        subplotter.add_mesh(grid_p, cmap=p_cmap, show_edges=False, scalar_bar_args=cbArgs)
         subplotter.add_mesh(p_contours, color="black", line_width=contourLinewidth)
         subplotter.view_xy()
         subplotter.show(window_size=FigWindowSize)

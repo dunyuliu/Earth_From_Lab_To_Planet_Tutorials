@@ -49,9 +49,6 @@ def midpoint(t, y, f, neq, h,par):
     return yout
 
 
-
-
-
 #
 # 4th order Runge Kutta 
 #
